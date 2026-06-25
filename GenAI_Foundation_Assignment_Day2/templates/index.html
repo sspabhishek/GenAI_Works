@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenAI Knowledge Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 GenAI Knowledge Assistant</h1>
+            <p class="subtitle">Ask me anything about GenAI concepts!</p>
+        </header>
+
+        <main>
+            <!-- Question Form -->
+            <section class="form-section">
+                <form id="questionForm">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="questionInput"
+                            placeholder="Ask a question about embeddings, RAG, transformers, LLMs, or vector databases..."
+                            required
+                        >
+                        <button type="submit" id="submitBtn">Ask</button>
+                    </div>
+                </form>
+                <p class="hint">💡 Try: "What is embeddings?" or "How does RAG work?"</p>
+            </section>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state hidden">
+                <div class="spinner"></div>
+                <p>Thinking...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state hidden">
+                <p id="errorMessage"></p>
+                <button class="btn-close" onclick="closeError()">Close</button>
+            </div>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="results-section hidden">
+
+                <!-- User Question -->
+                <div class="question-box">
+                    <h3>Your Question</h3>
+                    <p id="displayedQuestion"></p>
+                </div>
+
+                <!-- Retrieved Context -->
+                <div class="context-section">
+                    <h3>📚 Retrieved Context (Top 3 Matches)</h3>
+                    <div id="contextContainer" class="context-container"></div>
+                </div>
+
+                <!-- LLM Answer -->
+                <div class="answer-box">
+                    <h3>💡 Answer</h3>
+                    <div id="answerContent" class="answer-content"></div>
+                </div>
+
+                <!-- New Question Button -->
+                <div class="action-buttons">
+                    <button class="btn-new" onclick="resetForm()">Ask Another Question</button>
+                </div>
+
+            </section>
+
+            <!-- Initial Empty State -->
+            <section id="emptyState" class="empty-state">
+                <div class="empty-icon">📖</div>
+                <p>Ask a question to get started!</p>
+                <p class="empty-hint">The system will retrieve relevant knowledge and generate an answer using AI.</p>
+            </section>
+
+        </main>
+
+        <footer>
+            <p>GenAI Knowledge Assistant | Powered by Flask, ChromaDB, SentenceTransformer & Claude</p>
+        </footer>
+    </div>
+
+    <script>
+        // Handle form submission
+        document.getElementById('questionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await submitQuestion();
+        });
+
+        async function submitQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+
+            if (!question) {
+                showError('Please enter a question');
+                return;
+            }
+
+            // Show loading state
+            showLoading();
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'An error occurred');
+                }
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayResults(data) {
+            // Hide empty state
+            document.getElementById('emptyState').classList.add('hidden');
+
+            // Display question
+            document.getElementById('displayedQuestion').textContent = data.question;
+
+            // Display context
+            const contextContainer = document.getElementById('contextContainer');
+            contextContainer.innerHTML = '';
+
+            data.context.forEach((doc, index) => {
+                const contextCard = document.createElement('div');
+                contextCard.className = 'context-card';
+                contextCard.innerHTML = `
+                    <div class="context-header">
+                        <span class="context-number">Source ${index + 1}</span>
+                        <span class="topic-badge">${doc.topic}</span>
+                    </div>
+                    <p class="context-text">${doc.text}</p>
+                    <div class="similarity-info">
+                        <span>Distance: ${doc.distance.toFixed(4)}</span>
+                        <span>Similarity: ${(doc.similarity * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+                contextContainer.appendChild(contextCard);
+            });
+
+            // Display answer
+            document.getElementById('answerContent').textContent = data.answer;
+
+            // Show results section
+            document.getElementById('resultsSection').classList.remove('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+        }
+
+        function closeError() {
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+        }
+
+        function resetForm() {
+            document.getElementById('questionInput').value = '';
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('questionInput').focus();
+        }
+    </script>
+</body>
+</html>
